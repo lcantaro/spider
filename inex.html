@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spiderman Runner</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #87CEEB;
+            overflow: hidden;
+        }
+        canvas {
+            background: #fff;
+            max-width: 100%;
+            max-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const scale = window.devicePixelRatio || 1;
+        canvas.width = 375 * scale;
+        canvas.height = 667 * scale;
+        canvas.style.width = '375px';
+        canvas.style.height = '667px';
+
+        const spidermanSprite = [
+            [0,0,1,1,1,1,0,0],
+            [0,1,0,0,0,0,1,0],
+            [1,0,1,1,1,1,0,1],
+            [1,0,1,0,0,1,0,1],
+            [1,1,1,0,0,1,1,1],
+            [0,0,1,1,1,1,0,0],
+            [0,1,0,1,1,0,1,0],
+            [1,0,0,1,1,0,0,1]
+        ];
+
+        let spiderman = {
+            x: 50,
+            y: canvas.height - 80,
+            width: 64,
+            height: 64,
+            velocityY: 0,
+            jumping: false,
+            touchStartTime: 0
+        };
+
+        let obstacles = [];
+        let gameSpeed = 4;
+        let score = 0;
+        let gameOver = false;
+
+        // Generazione ostacoli con dimensioni variabili
+        function spawnObstacle() {
+            const size = Math.random() * 40 + 20; // Da 20 a 60
+            const obstacle = {
+                x: canvas.width,
+                y: canvas.height - 80 - size + 40, // Adatta l'altezza al terreno
+                width: size,
+                height: size
+            };
+            obstacles.push(obstacle);
+        }
+
+        // Disegna Spiderman
+        function drawSpiderman() {
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+                    if (spidermanSprite[y][x]) {
+                        ctx.fillStyle = '#FF0000';
+                        ctx.fillRect(spiderman.x + x * 8, spiderman.y + y * 8, 8, 8);
+                    }
+                }
+            }
+        }
+
+        // Disegna ostacoli
+        function drawObstacles() {
+            ctx.fillStyle = '#000000';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        // Aggiorna posizione
+        function update() {
+            if (gameOver) return;
+
+            spiderman.velocityY += 0.5;
+            spiderman.y += spiderman.velocityY;
+            
+            if (spiderman.y > canvas.height - 80) {
+                spiderman.y = canvas.height - 80;
+                spiderman.velocityY = 0;
+                spiderman.jumping = false;
+            }
+
+            obstacles.forEach((obstacle, index) => {
+                obstacle.x -= gameSpeed;
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                    score += 10;
+                }
+
+                if (spiderman.x < obstacle.x + obstacle.width &&
+                    spiderman.x + spiderman.width > obstacle.x &&
+                    spiderman.y < obstacle.y + obstacle.height &&
+                    spiderman.y + spiderman.height > obstacle.y) {
+                    gameOver = true;
+                }
+            });
+
+            if (Math.random() < 0.01) spawnObstacle();
+        }
+
+        // Disegna tutto
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
+
+            drawSpiderman();
+            drawObstacles();
+
+            ctx.fillStyle = '#000';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+
+            if (gameOver) {
+                ctx.fillText('Game Over! Press R or tap to restart', canvas.width/2 - 80, canvas.height/2);
+            }
+        }
+
+        // Funzioni per i salti
+        function jumpNormal() {
+            if (!spiderman.jumping && !gameOver) {
+                spiderman.velocityY = -15; // Salto normale
+                spiderman.jumping = true;
+            }
+        }
+
+        function jumpHigh() {
+            if (!spiderman.jumping && !gameOver) {
+                spiderman.velocityY = -25; // Salto più alto
+                spiderman.jumping = true;
+            }
+        }
+
+        // Controllo touch (per dispositivi mobili)
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!spiderman.jumping && !gameOver) {
+                spiderman.touchStartTime = Date.now();
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!spiderman.jumping && !gameOver) {
+                const touchDuration = Date.now() - spiderman.touchStartTime;
+                const jumpForce = Math.min(touchDuration / 20, 20); // Max 20
+                spiderman.velocityY = -12 - jumpForce; // Salto base + forza extra
+                spiderman.jumping = true;
+            }
+            if (gameOver) {
+                obstacles = [];
+                score = 0;
+                gameOver = false;
+                spiderman.y = canvas.height - 80;
+            }
+        });
+
+        // Controllo tastiera (per desktop)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') { // Barra spaziatrice per salto normale
+                e.preventDefault(); // Evita lo scroll della pagina
+                jumpNormal();
+            }
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { // Shift per salto più alto
+                e.preventDefault();
+                jumpHigh();
+            }
+            if (e.code === 'KeyR' && gameOver) { // 'R' per resettare il gioco
+                obstacles = [];
+                score = 0;
+                gameOver = false;
+                spiderman.y = canvas.height - 80;
+            }
+        });
+
+        // Loop di gioco
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
